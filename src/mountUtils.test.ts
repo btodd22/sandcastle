@@ -322,6 +322,24 @@ describe("normalizeMounts", () => {
       // sandboxPath is already a valid POSIX path, unchanged
       expect(result[0]!.sandboxPath).toBe("/mnt/cache");
     });
+
+    it("remaps sandboxPath under worktree even when path casing differs", () => {
+      // hostRepoDir passed with different case than the sandboxPath — Windows
+      // is case-insensitive so these should still match.
+      const mounts = [
+        {
+          hostPath: "C:\\Users\\PROJECT\\.git",
+          sandboxPath: "c:\\users\\project\\.git",
+        },
+      ];
+      const result = normalizeMounts(
+        mounts,
+        "C:\\Users\\PROJECT",
+        SANDBOX_REPO_DIR,
+        "win32",
+      );
+      expect(result[0]!.sandboxPath).toBe(`${SANDBOX_REPO_DIR}/.git`);
+    });
   });
 });
 
@@ -515,6 +533,31 @@ describe("patchGitMountsForWindows", () => {
         "win32",
       );
       expect(result).toEqual(mounts);
+    });
+
+    it("matches parent .git dir case-insensitively (drive letter or path casing differs)", async () => {
+      // hostPath has uppercase drive + mixed case; gitdir line has lowercase — common on Windows
+      const mounts = [
+        {
+          hostPath: "C:/Dev/MyProject/.git",
+          sandboxPath: "C:/Dev/MyProject/.git",
+        },
+      ];
+      const result = await patchGitMountsForWindows(
+        mounts,
+        "/tmp/test-worktree",
+        SANDBOX_REPO_DIR,
+        makeReadFile("gitdir: c:/dev/myproject/.git/worktrees/my-wt\n"),
+        makeStatFile("file"),
+        "win32",
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        hostPath: "C:/Dev/MyProject/.git",
+        sandboxPath: PARENT_GIT_SANDBOX_DIR,
+      });
+      expect(result[1]!.sandboxPath).toBe(`${SANDBOX_REPO_DIR}/.git`);
     });
 
     it("handles Windows backslash gitdir paths", async () => {

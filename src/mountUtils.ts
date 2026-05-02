@@ -147,13 +147,17 @@ export const normalizeMounts = <
       // This is a Windows-style path — remap it
       const normalizedSandboxPath = sandboxPath.replace(/\\/g, "/");
 
-      if (normalizedSandboxPath.startsWith(normalizedWorktree + "/")) {
+      // Use lowercase comparison: Windows paths are case-insensitive
+      const normalizedSandboxLower = normalizedSandboxPath.toLowerCase();
+      const normalizedWorktreeLower = normalizedWorktree.toLowerCase();
+
+      if (normalizedSandboxLower.startsWith(normalizedWorktreeLower + "/")) {
         // Under the worktree: derive sandbox path relative to sandboxRepoDir
         const relativeSuffix = normalizedSandboxPath.slice(
           normalizedWorktree.length,
         );
         sandboxPath = sandboxRepoDir + relativeSuffix;
-      } else if (normalizedSandboxPath === normalizedWorktree) {
+      } else if (normalizedSandboxLower === normalizedWorktreeLower) {
         sandboxPath = sandboxRepoDir;
       } else {
         // Not under the worktree — just normalize slashes
@@ -259,15 +263,20 @@ export const patchGitMountsForWindows = async (
   const normalizedParentGitDir = parentGitDir.replace(/\\/g, "/");
   const gitFileHostPath = gitEntryPath.replace(/\\/g, "/");
 
+  // Windows paths are case-insensitive; normalize to lowercase for comparison
+  const normalizedParentGitDirLower = normalizedParentGitDir.toLowerCase();
+  const gitFileHostPathLower = gitFileHostPath.toLowerCase();
+
   const correctedMounts: Array<{ hostPath: string; sandboxPath: string }> = [];
   let replacedGitFile = false;
 
   for (const m of gitMounts) {
     const normalizedHostPath = m.hostPath.replace(/\\/g, "/");
-    if (normalizedHostPath === normalizedParentGitDir) {
+    const normalizedHostPathLower = normalizedHostPath.toLowerCase();
+    if (normalizedHostPathLower === normalizedParentGitDirLower) {
       // Remap parent .git dir to deterministic sandbox path
       correctedMounts.push({ ...m, sandboxPath: PARENT_GIT_SANDBOX_DIR });
-    } else if (normalizedHostPath === gitFileHostPath) {
+    } else if (normalizedHostPathLower === gitFileHostPathLower) {
       // Replace .git file mount with corrected version (host repo is a worktree)
       correctedMounts.push({
         ...m,
